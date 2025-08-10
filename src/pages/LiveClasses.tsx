@@ -116,30 +116,42 @@ const LiveClasses = () => {
         ) : (
           <div className="space-y-4">
             {liveLectures.map((classItem) => {
-              // Calculate time info for better display
+              // Calculate time info for better display - prioritize admin-provided time
               const getTimeDisplay = () => {
+                // Always show admin-provided scheduled time if available
                 if (classItem.scheduledTime) {
                   const scheduledDate = new Date(classItem.scheduledTime);
-                  const now = new Date();
-                  const timeDiff = scheduledDate.getTime() - now.getTime();
+                  const displayTime = scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                   
-                  if (timeDiff > 0) {
-                    const hours = Math.floor(timeDiff / (1000 * 60 * 60));
-                    const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
-                    return {
-                      text: `Starts in ${hours}h ${minutes}m`,
-                      time: scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                    };
-                  } else if (timeDiff > -3600000) { // Within last hour
+                  if (classItem.isLive) {
                     return {
                       text: 'Live Now',
-                      time: scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      time: displayTime
                     };
+                  } else {
+                    const now = new Date();
+                    const timeDiff = scheduledDate.getTime() - now.getTime();
+                    
+                    if (timeDiff > 0) {
+                      const hours = Math.floor(timeDiff / (1000 * 60 * 60));
+                      const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+                      return {
+                        text: `Starts in ${hours}h ${minutes}m`,
+                        time: displayTime
+                      };
+                    } else {
+                      return {
+                        text: 'Scheduled',
+                        time: displayTime
+                      };
+                    }
                   }
                 }
+                
+                // Fallback for legacy data without scheduled time
                 return {
-                  text: classItem.isLive ? 'Available Now' : 'Scheduled',
-                  time: classItem.scheduledTime ? new Date(classItem.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'
+                  text: classItem.isLive ? 'Available Now' : 'Not Scheduled',
+                  time: 'TBA'
                 };
               };
 

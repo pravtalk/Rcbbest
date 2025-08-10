@@ -38,32 +38,44 @@ const LiveLecturePlayer = ({ lecture, onJoinLive, showPreview = false }: LiveLec
   };
 
   const getTimeInfo = () => {
+    // Always prioritize admin-provided scheduled time
     if (lecture.scheduledTime) {
       const scheduledDate = new Date(lecture.scheduledTime);
-      const now = new Date();
-      const timeDiff = scheduledDate.getTime() - now.getTime();
+      const displayTime = scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       
-      if (timeDiff > 0) {
-        const hours = Math.floor(timeDiff / (1000 * 60 * 60));
-        const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
-        return {
-          status: 'upcoming',
-          message: `Starts in ${hours}h ${minutes}m`,
-          time: scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-      } else if (timeDiff > -3600000) { // Within last hour
+      if (lecture.isLive) {
         return {
           status: 'live',
           message: 'Live Now',
-          time: scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          time: displayTime
         };
+      } else {
+        const now = new Date();
+        const timeDiff = scheduledDate.getTime() - now.getTime();
+        
+        if (timeDiff > 0) {
+          const hours = Math.floor(timeDiff / (1000 * 60 * 60));
+          const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+          return {
+            status: 'upcoming',
+            message: `Starts in ${hours}h ${minutes}m`,
+            time: displayTime
+          };
+        } else {
+          return {
+            status: 'scheduled',
+            message: 'Scheduled',
+            time: displayTime
+          };
+        }
       }
     }
     
+    // Fallback for legacy data
     return {
       status: lecture.isLive ? 'live' : 'offline',
-      message: lecture.isLive ? 'Available Now' : 'Offline',
-      time: lecture.scheduledTime ? new Date(lecture.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null
+      message: lecture.isLive ? 'Available Now' : 'Not Scheduled',
+      time: 'TBA'
     };
   };
 
