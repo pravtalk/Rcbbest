@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Users, Settings, GraduationCap, Video, Trash2, Plus, Play, Edit } from 'lucide-react';
+import { Users, Settings, GraduationCap, Video, Trash2, Plus, Play, Edit, FileText, Brain, Upload, Target } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import EnhancedBatchManagement from '@/components/EnhancedBatchManagement';
 import { useLiveLectures } from '@/hooks/useLiveLectures';
@@ -58,6 +58,26 @@ const Admin = () => {
     videoUrl: '',
     instructor: '',
     scheduledTime: ''
+  });
+
+  // Practice Zone state
+  const [practiceNotes, setPracticeNotes] = useState<any[]>([]);
+  const [practiceQuestions, setPracticeQuestions] = useState<any[]>([]);
+  const [showNoteForm, setShowNoteForm] = useState(false);
+  const [showQuestionForm, setShowQuestionForm] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [noteForm, setNoteForm] = useState({
+    title: '',
+    subject: '',
+    description: '',
+    file: null as File | null
+  });
+  const [questionForm, setQuestionForm] = useState({
+    title: '',
+    subject: '',
+    description: '',
+    difficulty: 'Easy' as 'Easy' | 'Medium' | 'Hard',
+    time_limit_minutes: 30
   });
 
   useEffect(() => {
@@ -112,6 +132,27 @@ const Admin = () => {
 
       if (batchesError) throw batchesError;
       setBatches(batchesData || []);
+
+      // Fetch practice notes
+      const { data: notesData, error: notesError } = await supabase
+        .from('practice_notes')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (notesError) throw notesError;
+      setPracticeNotes(notesData || []);
+
+      // Fetch practice questions
+      const { data: questionsData, error: questionsError } = await supabase
+        .from('practice_questions')
+        .select(`
+          *,
+          question_items(count)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (questionsError) throw questionsError;
+      setPracticeQuestions(questionsData || []);
 
     } catch (error) {
       console.error('Error fetching admin data:', error);
@@ -336,6 +377,191 @@ const Admin = () => {
     }
   };
 
+  // Practice Zone Management Functions
+  const handleNoteUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!noteForm.file || !noteForm.title.trim() || !noteForm.subject.trim()) {
+      toast({
+        title: 'Missing Information',
+        description: 'Please fill in all required fields and select a file.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setUploadingFile(true);
+
+      // Upload file to Supabase storage
+      const fileExt = noteForm.file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('practice-notes')
+        .upload(fileName, noteForm.file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('practice-notes')
+        .getPublicUrl(fileName);
+
+      // Save note to database
+      const { data, error } = await supabase
+        .from('practice_notes')
+        .insert([{
+          title: noteForm.title.trim(),
+          subject: noteForm.subject.trim(),
+          description: noteForm.description.trim() || null,
+          file_url: publicUrl,
+          file_size_bytes: noteForm.file.size,
+          created_by: user?.id
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Update local state
+      setPracticeNotes(prev => [data, ...prev]);
+
+      // Reset form
+      setNoteForm({
+        title: '',
+        subject: '',
+        description: '',
+        file: null
+      });
+      setShowNoteForm(false);
+
+      toast({
+        title: 'Success',
+        description: 'Practice note uploaded successfully!',
+      });
+
+    } catch (error) {
+      console.error('Error uploading note:', error);
+      toast({
+        title: 'Upload Failed',
+        description: 'Failed to upload the note. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    try {
+      const { error } = await supabase
+        .from('practice_notes')
+        .delete()
+        .eq('id', noteId);
+
+      if (error) throw error;
+
+      setPracticeNotes(prev => prev.filter(note => note.id !== noteId));
+
+      toast({
+        title: 'Success',
+        description: 'Note deleted successfully!',
+      });
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete note.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleCreateQuestion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!questionForm.title.trim() || !questionForm.subject.trim()) {
+      toast({
+        title: 'Missing Information',
+        description: 'Please fill in all required fields.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('practice_questions')
+        .insert([{
+          title: questionForm.title.trim(),
+          subject: questionForm.subject.trim(),
+          description: questionForm.description.trim() || null,
+          difficulty: questionForm.difficulty,
+          time_limit_minutes: questionForm.time_limit_minutes,
+          created_by: user?.id
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Update local state
+      setPracticeQuestions(prev => [{ ...data, question_items: [{ count: 0 }] }, ...prev]);
+
+      // Reset form
+      setQuestionForm({
+        title: '',
+        subject: '',
+        description: '',
+        difficulty: 'Easy',
+        time_limit_minutes: 30
+      });
+      setShowQuestionForm(false);
+
+      toast({
+        title: 'Success',
+        description: 'Quiz created successfully! You can now add questions to it.',
+      });
+
+    } catch (error) {
+      console.error('Error creating question:', error);
+      toast({
+        title: 'Creation Failed',
+        description: 'Failed to create the quiz. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteQuestion = async (questionId: string) => {
+    try {
+      const { error } = await supabase
+        .from('practice_questions')
+        .delete()
+        .eq('id', questionId);
+
+      if (error) throw error;
+
+      setPracticeQuestions(prev => prev.filter(q => q.id !== questionId));
+
+      toast({
+        title: 'Success',
+        description: 'Quiz deleted successfully!',
+      });
+    } catch (error) {
+      console.error('Error deleting question:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete quiz.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (!user || userRole !== 'admin') {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -382,6 +608,18 @@ const Admin = () => {
       icon: Video,
       description: 'Available lectures',
     },
+    {
+      title: 'Practice Notes',
+      value: practiceNotes.length,
+      icon: FileText,
+      description: 'Study materials',
+    },
+    {
+      title: 'Practice Quizzes',
+      value: practiceQuestions.length,
+      icon: Brain,
+      description: 'Quiz questions',
+    },
   ];
 
   return (
@@ -397,7 +635,7 @@ const Admin = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-8">
           {statsCards.map((stat) => {
             const Icon = stat.icon;
             return (
@@ -421,10 +659,11 @@ const Admin = () => {
 
         {/* Admin Tabs */}
         <Tabs defaultValue="batches" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="batches" className="text-xs sm:text-sm">Batches</TabsTrigger>
             <TabsTrigger value="users" className="text-xs sm:text-sm">Users</TabsTrigger>
             <TabsTrigger value="live-lectures" className="text-xs sm:text-sm">Live Lectures</TabsTrigger>
+            <TabsTrigger value="practice-zone" className="text-xs sm:text-sm">Practice Zone</TabsTrigger>
           </TabsList>
 
           <TabsContent value="batches" className="space-y-4">
@@ -664,6 +903,355 @@ const Admin = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="practice-zone" className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Practice Notes Management */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        Practice Notes
+                      </CardTitle>
+                      <CardDescription>
+                        Upload PDF notes for students to download
+                      </CardDescription>
+                    </div>
+                    <Button 
+                      onClick={() => setShowNoteForm(true)}
+                      className="flex items-center gap-2"
+                      size="sm"
+                    >
+                      <Upload className="h-4 w-4" />
+                      Upload Note
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {showNoteForm && (
+                    <Card className="mb-4">
+                      <CardHeader>
+                        <CardTitle className="text-lg">Upload New Note</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <form onSubmit={handleNoteUpload} className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="noteTitle">Title *</Label>
+                              <Input
+                                id="noteTitle"
+                                value={noteForm.title}
+                                onChange={(e) => setNoteForm(prev => ({ ...prev, title: e.target.value }))}
+                                placeholder="Enter note title"
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="noteSubject">Subject *</Label>
+                              <Input
+                                id="noteSubject"
+                                value={noteForm.subject}
+                                onChange={(e) => setNoteForm(prev => ({ ...prev, subject: e.target.value }))}
+                                placeholder="Enter subject"
+                                required
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="noteDescription">Description</Label>
+                            <Textarea
+                              id="noteDescription"
+                              value={noteForm.description}
+                              onChange={(e) => setNoteForm(prev => ({ ...prev, description: e.target.value }))}
+                              placeholder="Enter description"
+                              rows={3}
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="noteFile">PDF File *</Label>
+                            <Input
+                              id="noteFile"
+                              type="file"
+                              accept=".pdf"
+                              onChange={(e) => setNoteForm(prev => ({ ...prev, file: e.target.files?.[0] || null }))}
+                              required
+                            />
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            <Button type="submit" disabled={uploadingFile}>
+                              {uploadingFile ? 'Uploading...' : 'Upload Note'}
+                            </Button>
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              onClick={() => setShowNoteForm(false)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </form>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <div className="space-y-4">
+                    {practiceNotes.length === 0 ? (
+                      <div className="text-center py-8">
+                        <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                        <h3 className="text-lg font-semibold mb-2">No Notes Uploaded</h3>
+                        <p className="text-muted-foreground mb-4">
+                          Upload your first practice note to get started
+                        </p>
+                        <Button 
+                          onClick={() => setShowNoteForm(true)}
+                          className="flex items-center gap-2"
+                        >
+                          <Upload className="h-4 w-4" />
+                          Upload Note
+                        </Button>
+                      </div>
+                    ) : (
+                      practiceNotes.map((note) => (
+                        <div
+                          key={note.id}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-3"
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h4 className="font-semibold">{note.title}</h4>
+                              <Badge variant="outline">{note.subject}</Badge>
+                            </div>
+                            {note.description && (
+                              <p className="text-sm text-muted-foreground mb-1">
+                                {note.description}
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              Downloads: {note.download_count} • Created: {new Date(note.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => window.open(note.file_url, '_blank')}
+                              className="flex items-center gap-1"
+                            >
+                              <FileText className="h-3 w-3" />
+                              View
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDeleteNote(note.id)}
+                              className="flex items-center gap-1"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Practice Questions Management */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Brain className="h-5 w-5" />
+                        Practice Quizzes
+                      </CardTitle>
+                      <CardDescription>
+                        Create quizzes and manage questions
+                      </CardDescription>
+                    </div>
+                    <Button 
+                      onClick={() => setShowQuestionForm(true)}
+                      className="flex items-center gap-2"
+                      size="sm"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Create Quiz
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {showQuestionForm && (
+                    <Card className="mb-4">
+                      <CardHeader>
+                        <CardTitle className="text-lg">Create New Quiz</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <form onSubmit={handleCreateQuestion} className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="questionTitle">Title *</Label>
+                              <Input
+                                id="questionTitle"
+                                value={questionForm.title}
+                                onChange={(e) => setQuestionForm(prev => ({ ...prev, title: e.target.value }))}
+                                placeholder="Enter quiz title"
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="questionSubject">Subject *</Label>
+                              <Input
+                                id="questionSubject"
+                                value={questionForm.subject}
+                                onChange={(e) => setQuestionForm(prev => ({ ...prev, subject: e.target.value }))}
+                                placeholder="Enter subject"
+                                required
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="difficulty">Difficulty *</Label>
+                              <select
+                                id="difficulty"
+                                value={questionForm.difficulty}
+                                onChange={(e) => setQuestionForm(prev => ({ ...prev, difficulty: e.target.value as 'Easy' | 'Medium' | 'Hard' }))}
+                                className="w-full px-3 py-2 border border-input bg-background rounded-md"
+                                required
+                              >
+                                <option value="Easy">Easy</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Hard">Hard</option>
+                              </select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="timeLimit">Time Limit (minutes) *</Label>
+                              <Input
+                                id="timeLimit"
+                                type="number"
+                                min="5"
+                                max="180"
+                                value={questionForm.time_limit_minutes}
+                                onChange={(e) => setQuestionForm(prev => ({ ...prev, time_limit_minutes: parseInt(e.target.value) }))}
+                                required
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="questionDescription">Description</Label>
+                            <Textarea
+                              id="questionDescription"
+                              value={questionForm.description}
+                              onChange={(e) => setQuestionForm(prev => ({ ...prev, description: e.target.value }))}
+                              placeholder="Enter description"
+                              rows={3}
+                            />
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            <Button type="submit">
+                              Create Quiz
+                            </Button>
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              onClick={() => setShowQuestionForm(false)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </form>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <div className="space-y-4">
+                    {practiceQuestions.length === 0 ? (
+                      <div className="text-center py-8">
+                        <Brain className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                        <h3 className="text-lg font-semibold mb-2">No Quizzes Created</h3>
+                        <p className="text-muted-foreground mb-4">
+                          Create your first practice quiz to get started
+                        </p>
+                        <Button 
+                          onClick={() => setShowQuestionForm(true)}
+                          className="flex items-center gap-2"
+                        >
+                          <Plus className="h-4 w-4" />
+                          Create Quiz
+                        </Button>
+                      </div>
+                    ) : (
+                      practiceQuestions.map((question) => (
+                        <div
+                          key={question.id}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-3"
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h4 className="font-semibold">{question.title}</h4>
+                              <Badge variant="outline">{question.subject}</Badge>
+                              <Badge 
+                                className={`text-white text-xs ${
+                                  question.difficulty === 'Easy' ? 'bg-green-500' :
+                                  question.difficulty === 'Medium' ? 'bg-yellow-500' : 'bg-red-500'
+                                }`}
+                              >
+                                {question.difficulty}
+                              </Badge>
+                            </div>
+                            {question.description && (
+                              <p className="text-sm text-muted-foreground mb-1">
+                                {question.description}
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              Questions: {question.question_items?.[0]?.count || 0} • 
+                              Time: {question.time_limit_minutes}min • 
+                              Created: {new Date(question.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                toast({
+                                  title: 'Feature Coming Soon',
+                                  description: 'Question management interface will be available soon.',
+                                });
+                              }}
+                              className="flex items-center gap-1"
+                            >
+                              <Edit className="h-3 w-3" />
+                              Manage
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDeleteQuestion(question.id)}
+                              className="flex items-center gap-1"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
         </Tabs>

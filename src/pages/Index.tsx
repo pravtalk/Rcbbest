@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Heart, User, LogOut, Shield } from "lucide-react";
+import { Search, Heart, User, LogOut, Shield, Target } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -269,9 +269,9 @@ const Index = () => {
         {/* Practice Zone Button */}
         <div className="fixed bottom-20 sm:bottom-24 right-3 sm:right-4 z-30">
           <Button 
-            variant="secondary" 
+            variant="default" 
             size="sm"
-            className="rounded-full shadow-lg hover:shadow-xl text-xs sm:text-sm px-3 sm:px-4"
+            className="rounded-full shadow-lg hover:shadow-xl text-xs sm:text-sm px-3 sm:px-4 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white border-0"
             onClick={() => {
               if (user) {
                 navigate('/practice');
@@ -280,7 +280,8 @@ const Index = () => {
               }
             }}
           >
-            🎯 Practice Zone
+            <Target className="w-3 sm:w-4 h-3 sm:h-4 mr-1" />
+            Practice Zone
           </Button>
         </div>
       </div>
