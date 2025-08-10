@@ -220,7 +220,7 @@ const Admin = () => {
     }
   };
 
-  const handleLiveFormSubmit = (e: React.FormEvent) => {
+  const handleLiveFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Basic field validation
