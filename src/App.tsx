@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import LiveClasses from "./pages/LiveClasses";
 import Subjects from "./pages/Subjects";
 import Lectures from "./pages/Lectures";
+import PracticeZone from "./pages/PracticeZone";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
@@ -36,6 +37,7 @@ const App = () => {
             <Route path="/admin" element={<Admin />} />
             <Route path="/batch/:batchId" element={<BatchView />} />
             <Route path="/live-classes" element={<LiveClasses />} />
+            <Route path="/practice" element={<PracticeZone />} />
             <Route path="/subjects" element={<Subjects />} />
             <Route path="/lectures/:subject?" element={<Lectures />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
