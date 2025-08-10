@@ -12,6 +12,7 @@ import { toast } from '@/hooks/use-toast';
 import { Users, Settings, GraduationCap, Video, Trash2, Plus, Play, Edit } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import EnhancedBatchManagement from '@/components/EnhancedBatchManagement';
+import { useLiveLectures } from '@/hooks/useLiveLectures';
 
 interface User {
   id: string;
@@ -47,7 +48,7 @@ const Admin = () => {
   const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
-  const [liveLectures, setLiveLectures] = useState<LiveLecture[]>([]);
+  const { liveLectures, loading: lecturesLoading, saveLectures, refreshLectures } = useLiveLectures();
   const [loading, setLoading] = useState(true);
   const [showLiveForm, setShowLiveForm] = useState(false);
   const [editingLecture, setEditingLecture] = useState<LiveLecture | null>(null);
@@ -112,12 +113,6 @@ const Admin = () => {
       if (batchesError) throw batchesError;
       setBatches(batchesData || []);
 
-      // Load live lectures from localStorage
-      const savedLectures = localStorage.getItem('liveLectures');
-      if (savedLectures) {
-        setLiveLectures(JSON.parse(savedLectures));
-      }
-
     } catch (error) {
       console.error('Error fetching admin data:', error);
       toast({
@@ -130,10 +125,7 @@ const Admin = () => {
     }
   };
 
-  const saveLiveLectures = (lectures: LiveLecture[]) => {
-    localStorage.setItem('liveLectures', JSON.stringify(lectures));
-    setLiveLectures(lectures);
-  };
+  // Remove this function as it's now handled by the hook
 
   const validateVideoUrl = (url: string): { isValid: boolean; message?: string; type?: string } => {
     if (!url.trim()) {
@@ -255,7 +247,7 @@ const Admin = () => {
         updatedLectures = [...liveLectures, newLecture];
       }
 
-      saveLiveLectures(updatedLectures);
+      saveLectures(updatedLectures);
       
       // Reset form
       setLiveForm({
@@ -308,7 +300,7 @@ const Admin = () => {
       }
 
       const updatedLectures = liveLectures.filter(lecture => lecture.id !== lectureId);
-      saveLiveLectures(updatedLectures);
+      saveLectures(updatedLectures);
       
       toast({
         title: 'Success',
@@ -339,7 +331,7 @@ const Admin = () => {
       const updatedLectures = liveLectures.map(lecture => 
         lecture.id === lectureId ? { ...lecture, isLive: !lecture.isLive } : lecture
       );
-      saveLiveLectures(updatedLectures);
+      saveLectures(updatedLectures);
       
       toast({
         title: 'Success',

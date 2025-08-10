@@ -8,6 +8,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import Navigation from "@/components/Navigation";
 import BatchCard from "@/components/BatchCard";
+import LiveLecturePlayer from "@/components/LiveLecturePlayer";
+import { useLiveLectures } from "@/hooks/useLiveLectures";
 import heroBanner from "@/assets/hero-banner.jpg";
 
 interface Batch {
@@ -26,6 +28,7 @@ const Index = () => {
   const [dbBatches, setDbBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
   const { user, userRole, signOut } = useAuth();
+  const { liveLectures } = useLiveLectures();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -187,6 +190,39 @@ const Index = () => {
             </Button>
           ))}
         </div>
+
+        {/* Live Lectures Section */}
+        {liveLectures.length > 0 && (
+          <div className="mb-6 sm:mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg sm:text-xl font-semibold">🔴 Live Classes</h2>
+              <Link to="/live-classes">
+                <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+                  View All
+                </Button>
+              </Link>
+            </div>
+            <div className="space-y-4">
+              {liveLectures.filter(lecture => lecture.isLive).slice(0, 2).map((lecture) => (
+                <LiveLecturePlayer
+                  key={lecture.id}
+                  lecture={lecture}
+                  showPreview={true}
+                  onJoinLive={() => navigate('/live-classes')}
+                />
+              ))}
+              {liveLectures.filter(lecture => lecture.isLive).length === 0 && 
+               liveLectures.filter(lecture => !lecture.isLive).slice(0, 1).map((lecture) => (
+                <LiveLecturePlayer
+                  key={lecture.id}
+                  lecture={lecture}
+                  showPreview={true}
+                  onJoinLive={() => navigate('/live-classes')}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Loved Batches Section */}
         <div className="mb-4 sm:mb-6">
