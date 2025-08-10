@@ -81,6 +81,11 @@ CREATE TRIGGER update_live_lectures_updated_at
 - **Solution**: Added red pulsing indicator on "Live" tab when lectures are active
 - **Result**: Visual indicator shows when live lectures are available
 
+### 5. ✅ Live Lectures Visibility for All Users
+- **Problem**: Live lectures only showed in admin app, not for regular users
+- **Solution**: Fixed conflicting RLS policies by splitting admin permissions into separate INSERT/UPDATE/DELETE policies
+- **Result**: All authenticated users can now see live lectures while only admins can manage them
+
 ## How to Use
 
 ### For Admins:
@@ -111,5 +116,33 @@ If you encounter issues:
 2. **Permission denied**: Ensure your user has admin role in `auth.users.raw_user_meta_data`
 3. **Not updating**: Check browser console for errors and Supabase connection
 4. **Time issues**: Ensure scheduled_time is in proper ISO 8601 format
+5. **Live lectures only visible to admins**: Run the fix script in `FIX_LIVE_LECTURES_VISIBILITY.sql`
+
+### Quick Fix for Visibility Issue
+
+If live lectures are only showing for admin users and not regular users, run this SQL in your Supabase SQL Editor:
+
+```sql
+-- Fix conflicting RLS policies
+DROP POLICY IF EXISTS "Allow admin users to manage live lectures" ON public.live_lectures;
+
+-- Create separate admin policies
+CREATE POLICY "Allow admin users to insert live lectures" ON public.live_lectures
+    FOR INSERT TO authenticated WITH CHECK (
+        EXISTS (SELECT 1 FROM auth.users WHERE auth.users.id = auth.uid() AND auth.users.raw_user_meta_data->>'role' = 'admin')
+    );
+
+CREATE POLICY "Allow admin users to update live lectures" ON public.live_lectures
+    FOR UPDATE TO authenticated USING (
+        EXISTS (SELECT 1 FROM auth.users WHERE auth.users.id = auth.uid() AND auth.users.raw_user_meta_data->>'role' = 'admin')
+    ) WITH CHECK (
+        EXISTS (SELECT 1 FROM auth.users WHERE auth.users.id = auth.uid() AND auth.users.raw_user_meta_data->>'role' = 'admin')
+    );
+
+CREATE POLICY "Allow admin users to delete live lectures" ON public.live_lectures
+    FOR DELETE TO authenticated USING (
+        EXISTS (SELECT 1 FROM auth.users WHERE auth.users.id = auth.uid() AND auth.users.raw_user_meta_data->>'role' = 'admin')
+    );
+```
 
 The system will automatically fall back to localStorage if database connection fails, ensuring continued functionality.
