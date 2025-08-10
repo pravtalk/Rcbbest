@@ -48,7 +48,7 @@ const Admin = () => {
   const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
-  const { liveLectures, loading: lecturesLoading, saveLectures, refreshLectures } = useLiveLectures();
+  const { liveLectures, loading: lecturesLoading, addLecture, updateLecture, deleteLecture, refreshLectures } = useLiveLectures();
   const [loading, setLoading] = useState(true);
   const [showLiveForm, setShowLiveForm] = useState(false);
   const [editingLecture, setEditingLecture] = useState<LiveLecture | null>(null);
@@ -227,27 +227,20 @@ const Admin = () => {
     }
 
     try {
-      const newLecture: LiveLecture = {
-        id: editingLecture?.id || Date.now().toString(),
+      const lectureData = {
         title: liveForm.title.trim(),
         description: liveForm.description.trim(),
         videoUrl: liveForm.videoUrl.trim(),
         instructor: liveForm.instructor.trim(),
         isLive: true,
         scheduledTime: liveForm.scheduledTime || undefined,
-        createdAt: editingLecture?.createdAt || new Date().toISOString()
       };
 
-      let updatedLectures;
       if (editingLecture) {
-        updatedLectures = liveLectures.map(lecture => 
-          lecture.id === editingLecture.id ? newLecture : lecture
-        );
+        await updateLecture(editingLecture.id, lectureData);
       } else {
-        updatedLectures = [...liveLectures, newLecture];
+        await addLecture(lectureData);
       }
-
-      saveLectures(updatedLectures);
       
       // Reset form
       setLiveForm({
@@ -287,7 +280,7 @@ const Admin = () => {
     setShowLiveForm(true);
   };
 
-  const handleDeleteLecture = (lectureId: string) => {
+  const handleDeleteLecture = async (lectureId: string) => {
     try {
       const lectureToDelete = liveLectures.find(lecture => lecture.id === lectureId);
       if (!lectureToDelete) {
@@ -299,8 +292,7 @@ const Admin = () => {
         return;
       }
 
-      const updatedLectures = liveLectures.filter(lecture => lecture.id !== lectureId);
-      saveLectures(updatedLectures);
+      await deleteLecture(lectureId);
       
       toast({
         title: 'Success',
@@ -316,7 +308,7 @@ const Admin = () => {
     }
   };
 
-  const toggleLectureStatus = (lectureId: string) => {
+  const toggleLectureStatus = async (lectureId: string) => {
     try {
       const lecture = liveLectures.find(l => l.id === lectureId);
       if (!lecture) {
@@ -328,10 +320,7 @@ const Admin = () => {
         return;
       }
 
-      const updatedLectures = liveLectures.map(lecture => 
-        lecture.id === lectureId ? { ...lecture, isLive: !lecture.isLive } : lecture
-      );
-      saveLectures(updatedLectures);
+      await updateLecture(lectureId, { isLive: !lecture.isLive });
       
       toast({
         title: 'Success',

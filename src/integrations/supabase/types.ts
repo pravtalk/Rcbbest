@@ -389,6 +389,42 @@ export type Database = {
         }
         Relationships: []
       }
+      live_lectures: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          instructor: string
+          is_live: boolean | null
+          scheduled_time: string | null
+          title: string
+          updated_at: string
+          video_url: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          instructor: string
+          is_live?: boolean | null
+          scheduled_time?: string | null
+          title: string
+          updated_at?: string
+          video_url: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          instructor?: string
+          is_live?: boolean | null
+          scheduled_time?: string | null
+          title?: string
+          updated_at?: string
+          video_url?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

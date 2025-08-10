@@ -4,10 +4,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import { useEffect } from "react";
+import { runMigrations } from "@/lib/migrations";
 import Index from "./pages/Index";
 import LiveClasses from "./pages/LiveClasses";
 import Subjects from "./pages/Subjects";
 import Lectures from "./pages/Lectures";
+import PracticeZone from "./pages/PracticeZone";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
@@ -15,7 +18,13 @@ import BatchView from "./pages/BatchView";
 
 const queryClient = new QueryClient();
 
-const App = () => (
+const App = () => {
+  useEffect(() => {
+    // Run migrations on app startup
+    runMigrations();
+  }, []);
+
+  return (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
@@ -28,6 +37,7 @@ const App = () => (
             <Route path="/admin" element={<Admin />} />
             <Route path="/batch/:batchId" element={<BatchView />} />
             <Route path="/live-classes" element={<LiveClasses />} />
+            <Route path="/practice" element={<PracticeZone />} />
             <Route path="/subjects" element={<Subjects />} />
             <Route path="/lectures/:subject?" element={<Lectures />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
@@ -37,6 +47,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;
